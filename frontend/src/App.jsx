@@ -1,115 +1,99 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect } from 'react';
 
 function App() {
-  const [productos, setProductos] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState(null)
+  const [productos, setProductos] = useState([]);
+  const [form, setForm] = useState({ nombre: '', precio: '', categoria: '' });
+  const [error, setError] = useState(''); // Estado para mostrar los errores en pantalla
 
-  // Campos del formulario
-  const [nombre, setNombre] = useState('')
-  const [precio, setPrecio] = useState('')
-  const [categoria, setCategoria] = useState('')
-  const [mensajeExito, setMensajeExito] = useState('')
-
-  // 1. Consumir API (GET /api/productos)
-  const obtenerProductos = async () => {
-    try {
-      setLoading(true)
-      setError(null)
-      const res = await fetch('http://localhost:5000/api/productos')
-      if (!res.ok) throw new Error('Error al conectar con la API')
-      const data = await res.json()
-      setProductos(data)
-    } catch (err) {
-      setError(err.message)
-    } finally {
-      setLoading(false)
-    }
-  }
-
+  // Cargar productos al iniciar
   useEffect(() => {
-    obtenerProductos()
-  }, [])
+    fetch('http://localhost:5000/api/productos')
+      .then((res) => res.json())
+      .then((data) => setProductos(data))
+      .catch((err) => console.error('Error al cargar productos:', err));
+  }, []);
 
-  // 2. Enviar datos a la API (POST /api/productos)
+  const handleChange = (e) => {
+    setForm({ ...form, [e.target.name]: e.target.value });
+  };
+
   const handleSubmit = async (e) => {
-    e.preventDefault()
-    setError(null)
-    setMensajeExito('')
-
-    if (!nombre || !precio || !categoria) {
-      setError('Todos los campos son obligatorios')
-      return
-    }
+    e.preventDefault();
+    setError(''); // Limpiar errores previos
 
     try {
       const res = await fetch('http://localhost:5000/api/productos', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ nombre, precio, categoria })
-      })
+        body: JSON.stringify(form)
+      });
 
-      const data = await res.json()
+      const data = await res.json();
 
+      // Si el backend devuelve un status de error (400)
       if (!res.ok) {
-        throw new Error(data.error || 'Error al guardar el producto')
+        setError(data.error || 'Ocurrió un error al guardar el producto');
+        return;
       }
 
-      setMensajeExito('¡Producto agregado correctamente!')
-      setNombre('')
-      setPrecio('')
-      setCategoria('')
-      obtenerProductos() // Actualizar la lista
+      // Si todo sale bien, agregamos el producto a la lista y limpiamos el formulario
+      setProductos([...productos, data]);
+      setForm({ nombre: '', precio: '', categoria: '' });
     } catch (err) {
-      setError(err.message)
+      setError('No se pudo conectar con el servidor.');
     }
-  }
+  };
 
   return (
-    <div style={{ padding: '20px', maxWidth: '600px', margin: '0 auto', fontFamily: 'sans-serif' }}>
+    <div style={{ padding: '20px', fontFamily: 'sans-serif' }}>
       <h1>Catálogo de Productos</h1>
 
-      {/* Formulario */}
-      <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '20px' }}>
-        <h3>Agregar Producto</h3>
+      {/* Alerta visible si ocurre un error de validación */}
+      {error && (
+        <div style={{ color: 'red', backgroundColor: '#ffe6e6', padding: '10px', borderRadius: '5px', marginBottom: '15px' }}>
+          <strong>Error:</strong> {error}
+        </div>
+      )}
+
+      <form onSubmit={handleSubmit} style={{ marginBottom: '20px' }}>
         <input
           type="text"
-          placeholder="Nombre"
-          value={nombre}
-          onChange={(e) => setNombre(e.target.value)}
+          name="nombre"
+          placeholder="Nombre del producto"
+          value={form.nombre}
+          onChange={handleChange}
+          style={{ marginRight: '10px' }}
         />
         <input
           type="number"
+          step="0.01" /* Limita la entrada visual a 2 decimales */
+          name="precio"
           placeholder="Precio"
-          value={precio}
-          onChange={(e) => setPrecio(e.target.value)}
+          value={form.precio}
+          onChange={handleChange}
+          style={{ marginRight: '10px' }}
         />
         <input
           type="text"
-          placeholder="Categoría"
-          value={categoria}
-          onChange={(e) => setCategoria(e.target.value)}
+          name="categoria"
+          placeholder="Categoría (debe ser única)"
+          value={form.categoria}
+          onChange={handleChange}
+          style={{ marginRight: '10px' }}
         />
-        <button type="submit">Agregar</button>
+        <button type="submit">Agregar Producto</button>
       </form>
 
-      {/* Mensajes de Estado */}
-      {mensajeExito && <p style={{ color: 'green' }}>{mensajeExito}</p>}
-      {error && <p style={{ color: 'red' }}><strong>Error:</strong> {error}</p>}
-      {loading && <p>Cargando productos desde la API...</p>}
-
-      {/* Lista de Productos */}
-      {!loading && !error && (
-        <ul>
-          {productos.map((p) => (
-            <li key={p.id}>
-              <strong>{p.nombre}</strong> - ${p.precio} ({p.categoria})
-            </li>
-          ))}
-        </ul>
-      )}
+      <h2>Lista de Productos</h2>
+      <ul>
+        {productos.map((prod) => (
+          <li key={prod.id}>
+            <strong>{prod.nombre}</strong> - Q{Number(prod.precio).toFixed(2)} <em>({prod.categoria})</em>
+          </li>
+        ))}
+      </ul>
     </div>
-  )
+  );
 }
 
-export default App
+export default App;
